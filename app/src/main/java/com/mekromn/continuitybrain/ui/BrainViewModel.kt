@@ -1,7 +1,6 @@
 package com.mekromn.continuitybrain.ui
 
 import android.app.Application
-import android.content.Intent
 import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -36,6 +35,8 @@ data class BrainUiState(
     val bridgeEnabled: Boolean = false,
     val bridgeToken: String = "",
     val bridgePort: Int = LocalBrainServer.DEFAULT_PORT,
+    val vaultBusy: Boolean = false,
+    val vaultStatus: String? = null,
     val error: String? = null,
 )
 
@@ -93,6 +94,65 @@ class BrainViewModel(application: Application) : AndroidViewModel(application) {
                     it.copy(
                         importing = false,
                         error = failure.message ?: failure.javaClass.simpleName,
+                    )
+                }
+            }
+        }
+    }
+
+    fun createPortableBackup(uri: Uri, passphrase: String) {
+        if (_state.value.vaultBusy) return
+        _state.update { it.copy(vaultBusy = true, vaultStatus = "Encrypting portable backup…", error = null) }
+        viewModelScope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    val output = app.contentResolver.openOutputStream(uri, "w")
+                        ?: error("Unable to create backup file")
+                    output.use { app.portableBackup.write(it, passphrase.toCharArray()) }
+                }
+            }.onSuccess { summary ->
+                _state.update {
+                    it.copy(
+                        vaultBusy = false,
+                        vaultStatus = "Backup complete: ${summary.conversations} conversations, ${summary.messages} messages, ${summary.attachments} attachments.",
+                    )
+                }
+            }.onFailure { failure ->
+                _state.update {
+                    it.copy(
+                        vaultBusy = false,
+                        vaultStatus = null,
+                        error = failure.message ?: failure.javaClass.simpleName,
+                    )
+                }
+            }
+        }
+    }
+
+    fun restorePortableBackup(uri: Uri, passphrase: String) {
+        if (_state.value.vaultBusy || _state.value.importing) return
+        _state.update { it.copy(vaultBusy = true, vaultStatus = "Decrypting and rebuilding Brain…", error = null) }
+        viewModelScope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    val input = app.contentResolver.openInputStream(uri)
+                        ?: error("Unable to open backup file")
+                    input.use { app.portableBackup.restore(it, passphrase.toCharArray()) }
+                }
+            }.onSuccess { summary ->
+                _state.update {
+                    it.copy(
+                        vaultBusy = false,
+                        vaultStatus = "Restore complete: ${summary.conversations} conversations, ${summary.messages} messages, ${summary.attachments} attachments processed.",
+                    )
+                }
+                refresh()
+            }.onFailure { failure ->
+                _state.update {
+                    it.copy(
+                        vaultBusy = false,
+                        vaultStatus = null,
+                        error = failure.message ?: "Restore failed — verify the backup passphrase",
                     )
                 }
             }
