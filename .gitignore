@@ -1,0 +1,55 @@
+# Android / Gradle
+.gradle/
+.idea/
+local.properties
+**/build/
+*.iml
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Signing material
+*.jks
+*.keystore
+*.p12
+*.pem
+*.key
+keystore.properties
+
+# Continuity Brain private data — NEVER COMMIT
+*.db
+*.db-*
+*.sqlite
+*.sqlite3
+*.cbbrain
+*.brainbackup
+*.enc
+*.chatgpt-export*
+*chatgpt*export*.zip
+*ChatGPT*export*.zip
+conversations.json
+chat.html
+user.json
+message_feedback.json
+model_comparisons.json
+shared_conversations.json
+private-data/
+imports/
+exports/
+vault/
+brain-data/
+embeddings/
+attachments-private/
+
+# Generic archives are ignored by default because ChatGPT exports are archives.
+*.zip
+*.tar
+*.tgz
+*.gz
+*.7z
+*.rar
+
+# OS/editor
+.DS_Store
+Thumbs.db
+*.swp
