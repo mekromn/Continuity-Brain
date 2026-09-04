@@ -37,6 +37,13 @@ data class BrainUiState(
     val bridgePort: Int = LocalBrainServer.DEFAULT_PORT,
     val vaultBusy: Boolean = false,
     val vaultStatus: String? = null,
+    val semanticReady: Boolean = false,
+    val semanticModelHash: String? = null,
+    val semanticDimensions: Int = 0,
+    val semanticIndexed: Int = 0,
+    val semanticPending: Int = 0,
+    val semanticIndexing: Boolean = false,
+    val semanticStatus: String? = null,
     val error: String? = null,
 )
 
@@ -54,16 +61,30 @@ class BrainViewModel(application: Application) : AndroidViewModel(application) {
     fun refresh() {
         viewModelScope.launch {
             val snapshot = withContext(Dispatchers.IO) {
-                Triple(repository.stats(), repository.listProjects(), repository.timeline(120))
+                val model = app.semanticIndex.modelInfo()
+                RefreshSnapshot(
+                    stats = repository.stats(),
+                    projects = repository.listProjects(),
+                    timeline = repository.timeline(120),
+                    modelHash = model?.hash,
+                    modelDimensions = model?.dimensions ?: 0,
+                    semanticIndexed = if (model == null) 0 else app.semanticIndex.indexedCount(),
+                    semanticPending = if (model == null) 0 else app.semanticIndex.pendingCount(),
+                )
             }
             _state.update {
                 it.copy(
                     loading = false,
-                    stats = snapshot.first,
-                    projects = snapshot.second,
-                    timeline = snapshot.third,
+                    stats = snapshot.stats,
+                    projects = snapshot.projects,
+                    timeline = snapshot.timeline,
                     bridgeEnabled = repository.getEncryptedSetting(BrainBridgeService.SETTING_ENABLED) == "true",
                     bridgeToken = tokenStore.token(),
+                    semanticReady = snapshot.modelHash != null,
+                    semanticModelHash = snapshot.modelHash,
+                    semanticDimensions = snapshot.modelDimensions,
+                    semanticIndexed = snapshot.semanticIndexed,
+                    semanticPending = snapshot.semanticPending,
                 )
             }
         }
@@ -159,6 +180,84 @@ class BrainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun installEmbeddingModel(uri: Uri) {
+        if (_state.value.semanticIndexing || _state.value.vaultBusy) return
+        _state.update { it.copy(semanticStatus = "Validating local embedding model…", error = null) }
+        viewModelScope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    val input = app.contentResolver.openInputStream(uri)
+                        ?: error("Unable to open embedding model")
+                    input.use(app.semanticIndex::installModel)
+                }
+            }.onSuccess { model ->
+                _state.update {
+                    it.copy(
+                        semanticReady = true,
+                        semanticModelHash = model.hash,
+                        semanticDimensions = model.dimensions,
+                        semanticIndexed = 0,
+                        semanticPending = it.stats.messages,
+                        semanticStatus = "Local ${model.dimensions}-dimension embedder installed. Build the semantic index when ready.",
+                    )
+                }
+                refresh()
+            }.onFailure { failure ->
+                _state.update {
+                    it.copy(
+                        semanticStatus = null,
+                        error = failure.message ?: "Embedding model is not compatible",
+                    )
+                }
+            }
+        }
+    }
+
+    fun buildSemanticIndex() {
+        if (_state.value.semanticIndexing) return
+        _state.update { it.copy(semanticIndexing = true, semanticStatus = "Starting semantic index…", error = null) }
+        viewModelScope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    app.semanticIndex.buildIndex { progress ->
+                        _state.update {
+                            it.copy(
+                                semanticIndexing = true,
+                                semanticIndexed = it.semanticIndexed + if (progress.indexed == 0) 0 else 0,
+                                semanticPending = progress.remaining,
+                                semanticStatus = buildString {
+                                    append("Embedding ")
+                                    append(progress.indexed)
+                                    append(" new messages")
+                                    if (!progress.currentConversation.isNullOrBlank()) {
+                                        append(" • ")
+                                        append(progress.currentConversation)
+                                    }
+                                },
+                            )
+                        }
+                    }
+                }
+            }.onSuccess { newlyIndexed ->
+                _state.update {
+                    it.copy(
+                        semanticIndexing = false,
+                        semanticStatus = "Semantic index ready • $newlyIndexed new messages embedded locally.",
+                    )
+                }
+                refresh()
+            }.onFailure { failure ->
+                _state.update {
+                    it.copy(
+                        semanticIndexing = false,
+                        semanticStatus = null,
+                        error = failure.message ?: "Semantic indexing failed",
+                    )
+                }
+            }
+        }
+    }
+
     fun setQuery(query: String) {
         _state.update { it.copy(query = query) }
     }
@@ -171,7 +270,13 @@ class BrainViewModel(application: Application) : AndroidViewModel(application) {
             return
         }
         viewModelScope.launch {
-            val hits = withContext(Dispatchers.IO) { repository.search(cleaned, 80) }
+            val hits = withContext(Dispatchers.IO) {
+                if (_state.value.semanticReady && _state.value.semanticIndexed > 0) {
+                    app.semanticIndex.hybridSearch(cleaned, 80)
+                } else {
+                    repository.search(cleaned, 80)
+                }
+            }
             _state.update { it.copy(searchHits = hits) }
         }
     }
@@ -195,4 +300,14 @@ class BrainViewModel(application: Application) : AndroidViewModel(application) {
     fun clearError() {
         _state.update { it.copy(error = null) }
     }
+
+    private data class RefreshSnapshot(
+        val stats: BrainStats,
+        val projects: List<ProjectSummary>,
+        val timeline: List<TimelineItem>,
+        val modelHash: String?,
+        val modelDimensions: Int,
+        val semanticIndexed: Int,
+        val semanticPending: Int,
+    )
 }
