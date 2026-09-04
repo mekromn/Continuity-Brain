@@ -6,6 +6,8 @@ import com.mekromn.continuitybrain.data.BrainDatabase
 import com.mekromn.continuitybrain.data.BrainRepository
 import com.mekromn.continuitybrain.data.CryptoVault
 import com.mekromn.continuitybrain.importer.ChatGptExportImporter
+import com.mekromn.continuitybrain.semantic.LocalEmbeddingEngine
+import com.mekromn.continuitybrain.semantic.SemanticIndex
 
 class ContinuityBrainApplication : Application() {
     val cryptoVault: CryptoVault by lazy { CryptoVault() }
@@ -30,5 +32,26 @@ class ContinuityBrainApplication : Application() {
             repository = repository,
             crypto = cryptoVault,
         )
+    }
+    val embeddingEngine: LocalEmbeddingEngine by lazy {
+        LocalEmbeddingEngine(
+            context = this,
+            database = brainDatabase,
+            crypto = cryptoVault,
+        )
+    }
+    val semanticIndex: SemanticIndex by lazy {
+        SemanticIndex(
+            database = brainDatabase,
+            repository = repository,
+            crypto = cryptoVault,
+            engine = embeddingEngine,
+        )
+    }
+
+    override fun onTerminate() {
+        embeddingEngine.close()
+        brainDatabase.close()
+        super.onTerminate()
     }
 }
