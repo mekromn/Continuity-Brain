@@ -24,6 +24,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mekromn.continuitybrain.ui.theme.BrainBlack
@@ -84,7 +85,7 @@ fun BrainApp(viewModel: BrainViewModel) {
 
     val notificationPermission = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission(),
-    ) { granted ->
+    ) {
         // Android permits the foreground service even when notification display
         // permission is denied; the system still surfaces it in active apps.
         viewModel.setBridgeEnabled(true)
