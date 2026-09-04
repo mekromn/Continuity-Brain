@@ -1,6 +1,7 @@
 package com.mekromn.continuitybrain
 
 import android.app.Application
+import com.mekromn.continuitybrain.backup.PortableBrainBackup
 import com.mekromn.continuitybrain.data.BrainDatabase
 import com.mekromn.continuitybrain.data.BrainRepository
 import com.mekromn.continuitybrain.data.CryptoVault
@@ -19,6 +20,13 @@ class ContinuityBrainApplication : Application() {
     val importer: ChatGptExportImporter by lazy {
         ChatGptExportImporter(
             resolver = contentResolver,
+            repository = repository,
+            crypto = cryptoVault,
+        )
+    }
+    val portableBackup: PortableBrainBackup by lazy {
+        PortableBrainBackup(
+            database = brainDatabase,
             repository = repository,
             crypto = cryptoVault,
         )
