@@ -91,5 +91,8 @@ dependencies {
 
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
 
+    // Standalone runtime: no Play Services and no MediaPipe Tasks telemetry.
+    implementation("com.google.ai.edge.litert:litert:2.1.0")
+
     debugImplementation("androidx.compose.ui:ui-tooling")
 }
