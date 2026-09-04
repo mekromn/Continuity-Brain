@@ -9,7 +9,8 @@ import android.database.sqlite.SQLiteOpenHelper
  *
  * Sensitive human-readable values are encrypted by [CryptoVault] before they are
  * inserted. Plaintext columns are restricted to structural/provenance values,
- * opaque IDs, timestamps, enums, counts, hashes, and blind HMAC indexes.
+ * opaque IDs, timestamps, enums, counts, hashes, and non-reversible similarity
+ * signatures used to find encrypted vector candidates.
  */
 class BrainDatabase(context: Context) : SQLiteOpenHelper(
     context,
@@ -209,12 +210,49 @@ class BrainDatabase(context: Context) : SQLiteOpenHelper(
             )
             """.trimIndent(),
         )
+
+        createSemanticSchema(db)
+    }
+
+    private fun createSemanticSchema(db: SQLiteDatabase) {
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS embedding_models (
+                model_hash TEXT PRIMARY KEY,
+                engine TEXT NOT NULL,
+                model_path TEXT NOT NULL,
+                dimensions INTEGER,
+                installed_at REAL NOT NULL,
+                active INTEGER NOT NULL DEFAULT 0
+            )
+            """.trimIndent(),
+        )
+        db.execSQL("CREATE INDEX IF NOT EXISTS idx_embedding_models_active ON embedding_models(active)")
+
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS message_embeddings (
+                message_id TEXT NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+                model_hash TEXT NOT NULL REFERENCES embedding_models(model_hash) ON DELETE CASCADE,
+                dimensions INTEGER NOT NULL,
+                signature INTEGER NOT NULL,
+                vector_iv BLOB NOT NULL,
+                vector_ct BLOB NOT NULL,
+                indexed_at REAL NOT NULL,
+                PRIMARY KEY(message_id, model_hash)
+            ) WITHOUT ROWID
+            """.trimIndent(),
+        )
+        db.execSQL("CREATE INDEX IF NOT EXISTS idx_message_embeddings_model ON message_embeddings(model_hash)")
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-        // Schema starts at v1. Future versions must use explicit, lossless
-        // migrations because the database is the user's durable project memory.
-        if (oldVersion != newVersion) {
+        var version = oldVersion
+        if (version == 1 && newVersion >= 2) {
+            createSemanticSchema(db)
+            version = 2
+        }
+        if (version != newVersion) {
             throw IllegalStateException(
                 "Unsupported Continuity Brain database migration $oldVersion -> $newVersion",
             )
@@ -223,6 +261,6 @@ class BrainDatabase(context: Context) : SQLiteOpenHelper(
 
     companion object {
         private const val DATABASE_NAME = "continuity-brain.db"
-        private const val DATABASE_VERSION = 1
+        private const val DATABASE_VERSION = 2
     }
 }
