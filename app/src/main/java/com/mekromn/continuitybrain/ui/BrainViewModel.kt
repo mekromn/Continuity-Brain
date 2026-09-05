@@ -215,6 +215,7 @@ class BrainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun buildSemanticIndex() {
         if (_state.value.semanticIndexing) return
+        val startingIndexed = _state.value.semanticIndexed
         _state.update { it.copy(semanticIndexing = true, semanticStatus = "Starting semantic index…", error = null) }
         viewModelScope.launch {
             runCatching {
@@ -223,7 +224,7 @@ class BrainViewModel(application: Application) : AndroidViewModel(application) {
                         _state.update {
                             it.copy(
                                 semanticIndexing = true,
-                                semanticIndexed = it.semanticIndexed + if (progress.indexed == 0) 0 else 0,
+                                semanticIndexed = startingIndexed + progress.indexed,
                                 semanticPending = progress.remaining,
                                 semanticStatus = buildString {
                                     append("Embedding ")
