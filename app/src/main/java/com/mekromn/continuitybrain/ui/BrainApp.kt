@@ -86,8 +86,6 @@ fun BrainApp(viewModel: BrainViewModel) {
     val notificationPermission = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission(),
     ) {
-        // Android permits the foreground service even when notification display
-        // permission is denied; the system still surfaces it in active apps.
         viewModel.setBridgeEnabled(true)
     }
 
@@ -139,7 +137,12 @@ fun BrainApp(viewModel: BrainViewModel) {
                 BrainScreen.entries.forEach { item ->
                     NavigationBarItem(
                         selected = screen == item,
-                        onClick = { screen = item },
+                        onClick = {
+                            if (screen == BrainScreen.Projects && item != BrainScreen.Projects) {
+                                viewModel.closeProject()
+                            }
+                            screen = item
+                        },
                         icon = {
                             Text(
                                 text = item.glyph,
@@ -176,14 +179,17 @@ fun BrainApp(viewModel: BrainViewModel) {
                     onQuery = viewModel::setQuery,
                     onSearch = viewModel::search,
                 )
-                BrainScreen.Projects -> ProjectsScreen(
-                    projects = state.projects,
-                    onProject = { project ->
-                        viewModel.setQuery(project.name)
-                        viewModel.search(project.name)
-                        screen = BrainScreen.Search
-                    },
-                )
+                BrainScreen.Projects -> when {
+                    state.projectLoading -> ProjectLoadingScreen(onBack = viewModel::closeProject)
+                    state.selectedProject != null -> ProjectDetailScreen(
+                        report = state.selectedProject,
+                        onBack = viewModel::closeProject,
+                    )
+                    else -> ProjectsScreen(
+                        projects = state.projects,
+                        onProject = viewModel::openProject,
+                    )
+                }
                 BrainScreen.Timeline -> TimelineScreen(state.timeline)
                 BrainScreen.Vault -> VaultScreen(
                     state = state,
