@@ -6,6 +6,7 @@ import com.mekromn.continuitybrain.data.BrainDatabase
 import com.mekromn.continuitybrain.data.BrainRepository
 import com.mekromn.continuitybrain.data.CryptoVault
 import com.mekromn.continuitybrain.importer.ChatGptExportImporter
+import com.mekromn.continuitybrain.retrieval.BrainRetrievalService
 import com.mekromn.continuitybrain.semantic.LocalEmbeddingEngine
 import com.mekromn.continuitybrain.semantic.SemanticIndex
 
@@ -46,6 +47,14 @@ class ContinuityBrainApplication : Application() {
             repository = repository,
             crypto = cryptoVault,
             engine = embeddingEngine,
+        )
+    }
+    val retrievalService: BrainRetrievalService by lazy {
+        BrainRetrievalService(
+            database = brainDatabase,
+            repository = repository,
+            crypto = cryptoVault,
+            semanticIndex = semanticIndex,
         )
     }
 
