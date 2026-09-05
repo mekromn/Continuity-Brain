@@ -5,6 +5,7 @@ import com.mekromn.continuitybrain.backup.PortableBrainBackup
 import com.mekromn.continuitybrain.data.BrainDatabase
 import com.mekromn.continuitybrain.data.BrainRepository
 import com.mekromn.continuitybrain.data.CryptoVault
+import com.mekromn.continuitybrain.data.DatabaseIntegrity
 import com.mekromn.continuitybrain.importer.ChatGptExportImporter
 import com.mekromn.continuitybrain.retrieval.BrainRetrievalService
 import com.mekromn.continuitybrain.semantic.LocalEmbeddingEngine
@@ -12,7 +13,11 @@ import com.mekromn.continuitybrain.semantic.SemanticIndex
 
 class ContinuityBrainApplication : Application() {
     val cryptoVault: CryptoVault by lazy { CryptoVault() }
-    val brainDatabase: BrainDatabase by lazy { BrainDatabase(this) }
+    val brainDatabase: BrainDatabase by lazy {
+        BrainDatabase(this).also { database ->
+            DatabaseIntegrity.install(database.writableDatabase)
+        }
+    }
     val repository: BrainRepository by lazy {
         BrainRepository(
             context = this,
