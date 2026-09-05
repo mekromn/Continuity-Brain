@@ -6,6 +6,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -404,7 +405,7 @@ internal fun VaultScreen(
 }
 
 @Composable
-private fun VaultCard(title: String, content: @Composable Column.() -> Unit) {
+private fun VaultCard(title: String, content: @Composable ColumnScope.() -> Unit) {
     Card(
         colors = CardDefaults.cardColors(containerColor = BrainSurface),
         shape = RoundedCornerShape(22.dp),
