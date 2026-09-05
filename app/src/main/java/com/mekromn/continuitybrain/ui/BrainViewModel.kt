@@ -5,6 +5,7 @@ import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.mekromn.continuitybrain.ContinuityBrainApplication
+import com.mekromn.continuitybrain.analysis.ProjectAnalyzer
 import com.mekromn.continuitybrain.bridge.BrainBridgeService
 import com.mekromn.continuitybrain.bridge.BridgeTokenStore
 import com.mekromn.continuitybrain.bridge.LocalBrainServer
@@ -29,6 +30,8 @@ data class BrainUiState(
     val importSummary: ImportSummary? = null,
     val stats: BrainStats = BrainStats(),
     val projects: List<ProjectSummary> = emptyList(),
+    val selectedProject: ProjectAnalyzer.ProjectReport? = null,
+    val projectLoading: Boolean = false,
     val timeline: List<TimelineItem> = emptyList(),
     val query: String = "",
     val searchHits: List<SearchHit> = emptyList(),
@@ -119,6 +122,28 @@ class BrainViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
         }
+    }
+
+    fun openProject(project: ProjectSummary) {
+        _state.update { it.copy(projectLoading = true, selectedProject = null, error = null) }
+        viewModelScope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) { app.projectAnalyzer.analyze(project.id) }
+            }.onSuccess { report ->
+                _state.update { it.copy(projectLoading = false, selectedProject = report) }
+            }.onFailure { failure ->
+                _state.update {
+                    it.copy(
+                        projectLoading = false,
+                        error = failure.message ?: "Unable to reconstruct project",
+                    )
+                }
+            }
+        }
+    }
+
+    fun closeProject() {
+        _state.update { it.copy(selectedProject = null, projectLoading = false) }
     }
 
     fun createPortableBackup(uri: Uri, passphrase: String) {
@@ -272,11 +297,7 @@ class BrainViewModel(application: Application) : AndroidViewModel(application) {
         }
         viewModelScope.launch {
             val hits = withContext(Dispatchers.IO) {
-                if (_state.value.semanticReady && _state.value.semanticIndexed > 0) {
-                    app.semanticIndex.hybridSearch(cleaned, 80)
-                } else {
-                    repository.search(cleaned, 80)
-                }
+                app.retrievalService.search(cleaned, 80)
             }
             _state.update { it.copy(searchHits = hits) }
         }
