@@ -1,6 +1,7 @@
 package com.mekromn.continuitybrain
 
 import android.app.Application
+import com.mekromn.continuitybrain.analysis.ProjectAnalyzer
 import com.mekromn.continuitybrain.backup.PortableBrainBackup
 import com.mekromn.continuitybrain.data.BrainDatabase
 import com.mekromn.continuitybrain.data.BrainRepository
@@ -60,6 +61,12 @@ class ContinuityBrainApplication : Application() {
             repository = repository,
             crypto = cryptoVault,
             semanticIndex = semanticIndex,
+        )
+    }
+    val projectAnalyzer: ProjectAnalyzer by lazy {
+        ProjectAnalyzer(
+            database = brainDatabase,
+            crypto = cryptoVault,
         )
     }
 
