@@ -41,9 +41,9 @@ object DatabaseIntegrity {
                 """.trimIndent(),
             )
 
-            // Clean up rows produced before these triggers existed. The first
-            // statement removes graph edges whose insight endpoint is gone. The
-            // second collapses already-existing live/export duplicates.
+            // Clean up rows produced before these triggers existed. Avoid a
+            // DELETE target alias here so the query remains valid on the older
+            // SQLite versions shipped by the minimum supported Android API.
             db.execSQL(
                 """
                 DELETE FROM edges
@@ -53,16 +53,16 @@ object DatabaseIntegrity {
             )
             db.execSQL(
                 """
-                DELETE FROM messages AS live
-                WHERE live.source='continuity-live'
+                DELETE FROM messages
+                WHERE source='continuity-live'
                   AND EXISTS (
                     SELECT 1 FROM messages AS exported
                     WHERE exported.source='export'
-                      AND exported.id<>live.id
-                      AND exported.conversation_id=live.conversation_id
-                      AND exported.role=live.role
-                      AND exported.ordinal=live.ordinal
-                      AND exported.content_hash=live.content_hash
+                      AND exported.id<>messages.id
+                      AND exported.conversation_id=messages.conversation_id
+                      AND exported.role=messages.role
+                      AND exported.ordinal=messages.ordinal
+                      AND exported.content_hash=messages.content_hash
                   )
                 """.trimIndent(),
             )
