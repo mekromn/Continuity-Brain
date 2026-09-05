@@ -62,6 +62,7 @@ class BrainBridgeService : Service() {
         val tokenStore = BridgeTokenStore(app.repository)
         val created = LocalBrainServer(
             repository = app.repository,
+            retrieval = app.retrievalService,
             tokenProvider = tokenStore::token,
         )
         created.start()
