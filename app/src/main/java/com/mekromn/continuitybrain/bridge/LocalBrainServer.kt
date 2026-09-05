@@ -1,6 +1,7 @@
 package com.mekromn.continuitybrain.bridge
 
 import com.mekromn.continuitybrain.data.BrainRepository
+import com.mekromn.continuitybrain.retrieval.BrainRetrievalService
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.BufferedOutputStream
@@ -23,6 +24,7 @@ import java.util.concurrent.atomic.AtomicBoolean
  */
 class LocalBrainServer(
     private val repository: BrainRepository,
+    private val retrieval: BrainRetrievalService,
     private val tokenProvider: () -> String,
     private val port: Int = DEFAULT_PORT,
 ) : AutoCloseable {
@@ -90,7 +92,7 @@ class LocalBrainServer(
                 JSONObject()
                     .put("ok", true)
                     .put("service", "continuity-brain")
-                    .put("protocol", 1)
+                    .put("protocol", 2)
                     .put("auth_required", true)
                     .toString(),
             )
@@ -152,7 +154,7 @@ class LocalBrainServer(
                 if (query.isBlank()) return respond(output, 400, jsonError("query is required"))
                 val limit = body.optInt("limit", 30).coerceIn(1, 100)
                 val hits = JSONArray()
-                repository.search(query, limit).forEach { hit ->
+                retrieval.search(query, limit).forEach { hit ->
                     hits.put(
                         JSONObject()
                             .put("message_id", hit.messageId)
@@ -171,7 +173,7 @@ class LocalBrainServer(
                 val query = body.optString("query").trim()
                 if (query.isBlank()) return respond(output, 400, jsonError("query is required"))
                 val maxChars = body.optInt("max_chars", 60_000).coerceIn(4_000, 120_000)
-                val pack = repository.buildContextPack(query, maxChars)
+                val pack = retrieval.buildContextPack(query, maxChars)
                 respond(
                     output,
                     200,
